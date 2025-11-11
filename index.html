@@ -47,10 +47,8 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useCallback } = React;
     
-    // --- ШАГ 2: ВСТАВЬТЕ ВАШ URL ИЗ KVdb.io ЗДЕСЬ ---
+    // URL для хранения данных, замените на свой из kvdb.io
     const SCHEDULE_API_URL = "https://kvdb.io/XXNk2AAo7MEDxed7bQD9NN/schedule"; 
-    // Например: "https://kvdb.io/AbCdEfGhIjKlMnOp/schedule"
-    // ----------------------------------------------------
 
     const NAMES = [
       'ТЕСЛА', 'НИК', 'НАТО', 'ФИМА'
@@ -61,15 +59,19 @@
       const [schedule, setSchedule] = useState({});
       const [isLoading, setIsLoading] = useState(true);
       const [isSaving, setIsSaving] = useState(false);
+      
+      const today = useMemo(() => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }, []);
 
       // Загрузка данных при первом рендере
       useEffect(() => {
         const fetchSchedule = async () => {
           setIsLoading(true);
           try {
-            // ИЗМЕНЕНИЕ: Добавлен { cache: 'no-cache' } для предотвращения кэширования браузером
             const response = await fetch(SCHEDULE_API_URL, { cache: 'no-cache' });
-            // kvdb возвращает 404 если ключ не найден, это нормально для первого раза
             if (response.ok) {
               const data = await response.json();
               setSchedule(data);
@@ -78,7 +80,6 @@
             }
           } catch (error) {
             console.error("Не удалось загрузить график:", error);
-            // Можно показать пользователю сообщение об ошибке
           } finally {
             setIsLoading(false);
           }
@@ -91,9 +92,7 @@
         try {
           await fetch(SCHEDULE_API_URL, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newSchedule)
           });
         } catch (error) {
@@ -105,15 +104,14 @@
 
       const handleSelectPerson = useCallback((date, person) => {
         const key = date.toISOString().split('T')[0];
-        
         setSchedule(prevSchedule => {
           const newSchedule = { ...prevSchedule };
           if (person) {
             newSchedule[key] = person;
           } else {
-            delete newSchedule[key]; // Удаляем ключ, если человек не выбран
+            delete newSchedule[key];
           }
-          saveSchedule(newSchedule); // Сохраняем полное расписание
+          saveSchedule(newSchedule);
           return newSchedule;
         });
       }, [saveSchedule]);
@@ -131,12 +129,11 @@
         const firstDayOfMonth = new Date(year, month, 1);
         const lastDayOfMonth = new Date(year, month + 1, 0);
         const daysInMonth = lastDayOfMonth.getDate();
-        const startDayOfWeek = firstDayOfMonth.getDay();
+        const startDayOfWeek = (firstDayOfMonth.getDay() + 6) % 7; // Пн = 0, Вс = 6
         const days = [];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+
         const prevMonthLastDay = new Date(year, month, 0).getDate();
-        for (let i = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; i > 0; i--) {
+        for (let i = startDayOfWeek; i > 0; i--) {
           days.push({ date: new Date(year, month - 1, prevMonthLastDay - i + 1), isCurrentMonth: false });
         }
         for (let i = 1; i <= daysInMonth; i++) {
@@ -148,7 +145,7 @@
           days.push({ date: new Date(year, month + 1, i), isCurrentMonth: false });
         }
         return days;
-      }, [currentDate]);
+      }, [currentDate, today]);
       
       if (isLoading) {
         return (
@@ -182,9 +179,24 @@
               {calendarDays.map(({ date, isCurrentMonth, isToday }) => {
                 const key = date.toISOString().split('T')[0];
                 const selectedPerson = schedule[key];
-                const dayClass = `relative aspect-square flex flex-col justify-start items-center p-1 sm:p-2 border border-transparent transition-colors duration-200 rounded-lg ${ isCurrentMonth ? 'bg-white hover:bg-slate-50' : 'bg-slate-50' }`;
-                const dateTextClass = `w-7 h-7 flex items-center justify-center rounded-full text-sm sm:text-base ${ isCurrentMonth ? 'text-slate-600' : 'text-slate-400' } ${ isToday ? 'bg-indigo-600 text-white font-bold' : '' }`;
+                const isPast = date.getTime() < today.getTime();
+
+                const dayClass = `relative aspect-square flex flex-col justify-start items-center p-1 sm:p-2 border border-transparent transition-all duration-200 rounded-lg ${
+                  isCurrentMonth
+                    ? selectedPerson
+                      ? 'bg-indigo-50'
+                      : 'bg-white hover:bg-slate-50'
+                    : 'bg-slate-50 text-slate-400'
+                }`;
                 
+                const dateTextClass = `w-7 h-7 flex items-center justify-center rounded-full text-sm sm:text-base ${
+                  isCurrentMonth ? 'text-slate-600' : 'text-slate-400'
+                } ${isToday ? 'bg-indigo-600 text-white font-bold shadow' : ''}`;
+                
+                const selectClass = `w-full text-xs sm:text-sm bg-transparent focus:outline-none text-center appearance-none cursor-pointer truncate ${
+                  selectedPerson ? 'font-semibold text-indigo-800' : 'text-slate-700'
+                }`;
+
                 return (
                   <div key={key} className={dayClass}>
                     <time dateTime={key} className={dateTextClass}>
@@ -195,7 +207,7 @@
                         <select
                           value={selectedPerson || ''}
                           onChange={(e) => handleSelectPerson(date, e.target.value)}
-                          className="w-full text-xs sm:text-sm bg-transparent text-slate-700 focus:outline-none text-center appearance-none cursor-pointer truncate"
+                          className={selectClass}
                           aria-label={`Assign person for ${key}`}
                         >
                           <option value="">-</option>
@@ -203,12 +215,14 @@
                         </select>
                       </div>
                     )}
-                    {selectedPerson && isCurrentMonth && <div className="absolute bottom-1.5 sm:bottom-2 w-1.5 h-1.5 bg-green-500 rounded-full"></div>}
+                    {selectedPerson && isCurrentMonth && isPast && (
+                      <div className="absolute bottom-1.5 sm:bottom-2 w-1.5 h-1.5 bg-green-500 rounded-full" title="Дежурство прошло"></div>
+                    )}
                   </div>
                 );
               })}
             </div>
-            {isSaving && <div className="absolute bottom-4 right-4 text-xs text-slate-400">Сохранение...</div>}
+            {isSaving && <div className="absolute bottom-4 right-4 text-xs text-slate-400 animate-pulse">Сохранение...</div>}
           </div>
         </div>
       );
