@@ -216,27 +216,37 @@
     }`;
 
     return (
-      <div key={key} className={dayClass}>
-        <time dateTime={key} className={dateTextClass}>
-          {date.getDate()}
-        </time>
-        {isCurrentMonth && selectedPerson && isPast && (
-          <div className="my-0.5 w-2 h-2 bg-green-500 rounded-full" title="Дежурство прошло"></div>
-        )}
-        {isCurrentMonth && (
-          <div className="w-full mt-auto">
-            <select
-              value={selectedPerson || ''}
-              onChange={(e) => handleSelectPerson(date, e.target.value)}
-              className={selectClass}
-              aria-label={`Назначить дежурного на ${key}`}
-            >
-              <option value=""></option>
-              {NAMES.map(name => <option key={name} value={name}>{name}</option>)}
-            </select>
-          </div>
-        )}
-      </div>
+   <div key={key} className={dayClass}>
+  <time dateTime={key} className={dateTextClass}>
+    {date.getDate()}
+  </time>
+  {isCurrentMonth && selectedPerson && (
+    <>
+      {/* Сегодня или прошлое → зелёная */}
+      {(isPast || isToday) && (
+        <div className="my-0.5 w-2 h-2 bg-green-500 rounded-full" title="Дежурство завершено"></div>
+      )}
+      {/* Будущее → жёлтая */}
+      {!isPast && !isToday && (
+        <div className="my-0.5 w-2 h-2 bg-yellow-500 rounded-full" title="Дежурство запланировано"></div>
+      )}
+    </>
+  )}
+  {isCurrentMonth && (
+    <div className="w-full mt-auto">
+      <select
+        value={selectedPerson || ''}
+        onChange={(e) => handleSelectPerson(date, e.target.value)}
+        className={selectClass}
+        aria-label={`Назначить дежурного на ${key}`}
+      >
+        <option value=""></option>
+        {NAMES.map(name => <option key={name} value={name}>{name}</option>)}
+      </select>
+    </div>
+  )}
+</div>
+
     );
   })}
 </div>
