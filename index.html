@@ -14,6 +14,18 @@
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
     }
+    /* Простая анимация для загрузчика */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .loader {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-left-color: #4f46e5;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
   </style>
 <script type="importmap">
 {
@@ -34,43 +46,76 @@
 
   <script type="text/babel">
     const { useState, useEffect, useMemo, useCallback } = React;
+    
+    // --- ШАГ 2: ВСТАВЬТЕ ВАШ URL ИЗ KVdb.io ЗДЕСЬ ---
+    const SCHEDULE_API_URL = "https://kvdb.io/XXNk2AAo7MEDxed7bQD9NN/schedule"; 
+    // Например: "https://kvdb.io/XXNk2AAo7MEDxed7bQD9NN/schedule"
+    // ----------------------------------------------------
 
     const NAMES = [
-      'Алиса', 'Борис', 'Карл', 'Диана', 'Эдуард', 'Фиона', 'Георгий', 'Анна'
+      'ТЕСЛА', 'НИК', 'НАТО', 'ФИМА'
     ];
 
     const App = () => {
       const [currentDate, setCurrentDate] = useState(new Date());
-      const [schedule, setSchedule] = useState(() => {
-        try {
-          const savedSchedule = localStorage.getItem('dutySchedule');
-          return savedSchedule ? JSON.parse(savedSchedule) : {};
-        } catch (error) {
-          console.error("Failed to parse schedule from localStorage", error);
-          return {};
-        }
-      });
+      const [schedule, setSchedule] = useState({});
+      const [isLoading, setIsLoading] = useState(true);
+      const [isSaving, setIsSaving] = useState(false);
 
+      // Загрузка данных при первом рендере
       useEffect(() => {
-        try {
-          localStorage.setItem('dutySchedule', JSON.stringify(schedule));
-        } catch (error) {
-          console.error("Failed to save schedule to localStorage", error);
-        }
-      }, [schedule]);
+        const fetchSchedule = async () => {
+          setIsLoading(true);
+          try {
+            const response = await fetch(SCHEDULE_API_URL);
+            // kvdb возвращает 404 если ключ не найден, это нормально для первого раза
+            if (response.ok) {
+              const data = await response.json();
+              setSchedule(data);
+            } else if (response.status !== 404) {
+               throw new Error(`HTTP error! status: ${response.status}`);
+            }
+          } catch (error) {
+            console.error("Не удалось загрузить график:", error);
+            // Можно показать пользователю сообщение об ошибке
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        fetchSchedule();
+      }, []);
       
+      const saveSchedule = useCallback(async (newSchedule) => {
+        setIsSaving(true);
+        try {
+          await fetch(SCHEDULE_API_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(newSchedule)
+          });
+        } catch (error) {
+          console.error("Ошибка сохранения графика:", error);
+        } finally {
+          setIsSaving(false);
+        }
+      }, []);
+
       const handleSelectPerson = useCallback((date, person) => {
         const key = date.toISOString().split('T')[0];
-        setSchedule(prev => {
-          const newSchedule = {...prev};
+        
+        setSchedule(prevSchedule => {
+          const newSchedule = { ...prevSchedule };
           if (person) {
             newSchedule[key] = person;
           } else {
-            delete newSchedule[key];
+            delete newSchedule[key]; // Удаляем ключ, если человек не выбран
           }
+          saveSchedule(newSchedule); // Сохраняем полное расписание
           return newSchedule;
         });
-      }, []);
+      }, [saveSchedule]);
 
       const changeMonth = (offset) => {
         setCurrentDate(prevDate => {
@@ -82,47 +127,36 @@
       const calendarDays = useMemo(() => {
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
-        
         const firstDayOfMonth = new Date(year, month, 1);
         const lastDayOfMonth = new Date(year, month + 1, 0);
-        
         const daysInMonth = lastDayOfMonth.getDate();
-        const startDayOfWeek = firstDayOfMonth.getDay(); // 0 (Sun) - 6 (Sat)
-        
+        const startDayOfWeek = firstDayOfMonth.getDay();
         const days = [];
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-
-        // Days from previous month
         const prevMonthLastDay = new Date(year, month, 0).getDate();
         for (let i = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; i > 0; i--) {
-          days.push({
-            date: new Date(year, month - 1, prevMonthLastDay - i + 1),
-            isCurrentMonth: false
-          });
+          days.push({ date: new Date(year, month - 1, prevMonthLastDay - i + 1), isCurrentMonth: false });
         }
-        
-        // Days of current month
         for (let i = 1; i <= daysInMonth; i++) {
           const date = new Date(year, month, i);
-          days.push({
-            date,
-            isCurrentMonth: true,
-            isToday: date.getTime() === today.getTime()
-          });
+          days.push({ date, isCurrentMonth: true, isToday: date.getTime() === today.getTime() });
         }
-        
-        // Days from next month
-        const remainingCells = 42 - days.length; // 6 weeks * 7 days
+        const remainingCells = 42 - days.length;
         for (let i = 1; i <= remainingCells; i++) {
-          days.push({
-            date: new Date(year, month + 1, i),
-            isCurrentMonth: false
-          });
+          days.push({ date: new Date(year, month + 1, i), isCurrentMonth: false });
         }
-        
         return days;
       }, [currentDate]);
+      
+      if (isLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen">
+                <div className="loader"></div>
+                <div className="mt-4 text-lg font-semibold text-slate-500">Загрузка графика...</div>
+            </div>
+        );
+      }
 
       return (
         <div className="flex flex-col items-center justify-center min-h-screen p-2 sm:p-4">
@@ -147,15 +181,8 @@
               {calendarDays.map(({ date, isCurrentMonth, isToday }) => {
                 const key = date.toISOString().split('T')[0];
                 const selectedPerson = schedule[key];
-                
-                const dayClass = `relative aspect-square flex flex-col justify-start items-center p-1 sm:p-2 border border-transparent transition-colors duration-200 rounded-lg ${
-                  isCurrentMonth ? 'bg-white hover:bg-slate-50' : 'bg-slate-50'
-                }`;
-                const dateTextClass = `w-7 h-7 flex items-center justify-center rounded-full text-sm sm:text-base ${
-                  isCurrentMonth ? 'text-slate-600' : 'text-slate-400'
-                } ${
-                  isToday ? 'bg-blue-600 text-white font-bold' : ''
-                }`;
+                const dayClass = `relative aspect-square flex flex-col justify-start items-center p-1 sm:p-2 border border-transparent transition-colors duration-200 rounded-lg ${ isCurrentMonth ? 'bg-white hover:bg-slate-50' : 'bg-slate-50' }`;
+                const dateTextClass = `w-7 h-7 flex items-center justify-center rounded-full text-sm sm:text-base ${ isCurrentMonth ? 'text-slate-600' : 'text-slate-400' } ${ isToday ? 'bg-indigo-600 text-white font-bold' : '' }`;
                 
                 return (
                   <div key={key} className={dayClass}>
@@ -180,6 +207,7 @@
                 );
               })}
             </div>
+            {isSaving && <div className="absolute bottom-4 right-4 text-xs text-slate-400">Сохранение...</div>}
           </div>
         </div>
       );
