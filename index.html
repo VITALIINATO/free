@@ -179,9 +179,11 @@
                             <button onClick={() => changeMonth(-1)} className="p-2 rounded-full hover:bg-indigo-50 transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                             </button>
+
                             <h2 className="text-lg sm:text-xl font-bold text-indigo-800 text-center capitalize">
                                 {currentDate.toLocaleString('ru-RU', { month: 'long' })} {currentDate.getFullYear()}
                             </h2>
+                            
                             <button onClick={() => changeMonth(1)} className="p-2 rounded-full hover:bg-indigo-50 transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                             </button>
@@ -191,50 +193,54 @@
                             <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
                         </div>
 
-                        <div className="calendar-grid">
-                            {calendarDays.map(({ date, isCurrentMonth, isToday }) => {
-                                const key = date.toISOString().split('T')[0];
-                                const selectedPerson = schedule[key];
-                                const isPast = date.getTime() < today.getTime();
+                       <div className="calendar-grid">
+  {calendarDays.map(({ date, isCurrentMonth, isToday }) => {
+    const key = date.toISOString().split('T')[0];
+    const selectedPerson = schedule[key];
+    const isPast = date.getTime() < today.getTime();
 
-                                const dayClass = `relative aspect-square flex flex-col justify-start items-center p-1 sm:p-2 border transition-all duration-200 rounded-lg ${isCurrentMonth
-                                        ? selectedPerson
-                                            ? 'bg-gradient-to-br from-violet-50 to-purple-50 border-violet-200'
-                                            : 'bg-white border-slate-200 hover:bg-indigo-50'
-                                        : 'bg-slate-100 text-slate-400 border-transparent'
-                                    }`;
+    const dayClass = `aspect-square flex flex-col justify-start items-center p-1 sm:p-2 border transition-all duration-200 rounded-lg ${
+      isCurrentMonth
+        ? selectedPerson
+          ? 'bg-gradient-to-br from-violet-50 to-purple-50 border-violet-200'
+          : 'bg-white border-slate-200 hover:bg-indigo-50'
+        : 'bg-slate-100 text-slate-400 border-transparent'
+    }`;
+    
+    const dateTextClass = `w-7 h-7 flex items-center justify-center rounded-full text-sm sm:text-base font-medium ${
+      isCurrentMonth ? 'text-indigo-800' : 'text-slate-400'
+    } ${isToday ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold shadow-md scale-110' : ''}`;
+    
+    const selectClass = `w-full mt-0.5 text-xs sm:text-sm bg-transparent focus:outline-none text-center cursor-pointer truncate py-1 font-medium ${
+      selectedPerson ? 'text-purple-700 font-semibold' : 'text-slate-600'
+    }`;
 
-                                const dateTextClass = `w-7 h-7 flex items-center justify-center rounded-full text-sm sm:text-base font-medium ${isCurrentMonth ? 'text-indigo-800' : 'text-slate-400'
-                                    } ${isToday ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold shadow-md scale-110' : ''}`;
+    return (
+      <div key={key} className={dayClass}>
+        <time dateTime={key} className={dateTextClass}>
+          {date.getDate()}
+        </time>
+        {isCurrentMonth && selectedPerson && isPast && (
+          <div className="my-0.5 w-2 h-2 bg-green-500 rounded-full" title="Дежурство прошло"></div>
+        )}
+        {isCurrentMonth && (
+          <div className="w-full mt-auto">
+            <select
+              value={selectedPerson || ''}
+              onChange={(e) => handleSelectPerson(date, e.target.value)}
+              className={selectClass}
+              aria-label={`Назначить дежурного на ${key}`}
+            >
+              <option value=""></option>
+              {NAMES.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+    );
+  })}
+</div>
 
-                                const selectClass = `w-full text-xs sm:text-sm bg-transparent focus:outline-none text-center cursor-pointer truncate py-1 font-medium ${selectedPerson ? 'text-purple-700 font-semibold' : 'text-slate-600'
-                                    }`;
-
-                                return (
-                                    <div key={key} className={dayClass}>
-                                        <time dateTime={key} className={dateTextClass}>
-                                            {date.getDate()}
-                                        </time>
-                                        {isCurrentMonth && (
-                                            <div className="w-full mt-1 sm:mt-2 flex-grow">
-                                                <select
-                                                    value={selectedPerson || ''}
-                                                    onChange={(e) => handleSelectPerson(date, e.target.value)}
-                                                    className={selectClass}
-                                                    aria-label={`Назначить дежурного на ${key}`}
-                                                >
-                                                    <option value="">Не назначен</option>
-                                                    {NAMES.map(name => <option key={name} value={name}>{name}</option>)}
-                                                </select>
-                                            </div>
-                                        )}
-                                        {selectedPerson && isCurrentMonth && isPast && (
-                                            <div className="absolute bottom-1.5 sm:bottom-2 w-2 h-2 bg-green-500 rounded-full" title="Дежурство прошло"></div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
                         {isSaving && <div className="absolute bottom-4 right-4 text-xs text-violet-600 font-medium animate-pulse">Сохранение...</div>}
                     </div>
                 </div>
